@@ -1,0 +1,569 @@
+/* =====================================================================
+   PROBLEM 2 – Closed Encounters Analysis (PostgreSQL / Retool Database)
+
+   Input tables (from P2_Step1_Cleaning.ipynb) – ONE ROW PER ENCOUNTER:
+     ehr_encounters(patient, provider, dos, cpt_codes, n_codes)              -- 6,612 rows
+     db_encounters (patient, provider, dos, cpt_codes, n_codes, db_records)  -- 6,374 rows
+   Encounter key = patient + provider + dos
+   cpt_codes looks like: '97010, 97110, 97140'
+   ===================================================================== */
+/* =====================================================================
+   TASK 1 – Which EHR encounters are NOT in the DB?   (anti-join)
+   ===================================================================== */
+-- T1a. The missing list (Task 1 deliverable)
+SELECT e.patient, e.dos AS date_of_service, e.provider, e.cpt_codes
+FROM ehr_encounters e
+LEFT JOIN db_encounters d
+       ON  d.patient  = e.patient
+       AND d.provider = e.provider
+       AND d.dos      = e.dos
+WHERE d.patient IS NULL               -- no match in the DB = missing
+ORDER BY e.patient, e.dos;
+      patient       | date_of_service |      provider      |                    cpt_codes                     
+--------------------+-----------------+--------------------+--------------------------------------------------
+ Aiden Allen        | 2024-08-28      | Aiden King         | 97113, NORCM
+ Aiden Allen        | 2024-08-30      | Noah Lee           | 97010, 97140, NORCM
+ Aiden Allen        | 2024-09-04      | Aiden King         | 97113, NORCM
+ Aiden Allen        | 2024-09-06      | Noah Lee           | 97010, 97140, NORCM
+ Aiden Allen        | 2024-09-10      | Aiden King         | 97010, 97113, NORCM
+ Aiden Allen        | 2024-09-25      | Aiden King         | 97113, NORCM
+ Aiden Allen        | 2024-09-25      | Liam Young         | 97010, 97110, 97140
+ Aiden Allen        | 2024-09-25      | Noah Lee           | 97010, 97140, NORCM
+ Aiden Clark        | 2024-09-04      | Liam Young         | 97010, 97014, 97110, 97112, 97140
+ Aiden Clark        | 2024-09-06      | Noah Lee           | 97010, 97014, 97110, 97112, 97140
+ Ava Anderson       | 2024-07-10      | Aiden King         | 97110, 97112, 97140, 97163, NORCM, sp120
+ Ava Hernandez      | 2024-08-15      | Noah Lee           | 97035, 97110, 97112, 97140, NORCM
+ Ava Hernandez      | 2024-08-19      | Noah Lee           | 97035, 97110, 97112, 97140, NORCM
+ Ava Hernandez      | 2024-08-26      | Noah Lee           | 97035, 97110, 97112, 97140, NORCM
+ Ava Hernandez      | 2024-08-28      | Noah Lee           | 97035, 97110, 97112, 97140, NORCM
+ Ava Hernandez      | 2024-09-03      | Noah Lee           | 97035, 97110, 97112, 97140, NORCM
+ Ava Hernandez      | 2024-09-05      | Noah Lee           | 97035, 97110, 97112, 97140, NORCM
+ Ava Hernandez      | 2024-09-10      | Noah Lee           | 97035, 97110, 97112, 97140, NORCM
+ Ava Hernandez      | 2024-09-12      | Noah Lee           | 1, 97010, 97035, 97112, 97140
+ Ava Hernandez      | 2024-09-16      | Noah Lee           | 97010, 97035, 97112, 97140, NORCM
+ Ava Hernandez      | 2024-09-18      | Noah Lee           | 97110, 97112, 97140, NORCM
+ Ava Hernandez      | 2024-09-24      | Noah Lee           | 97110, 97112, 97140, NORCM
+ Ava Hernandez      | 2024-09-26      | Noah Lee           | 97110, 97112, 97140, NORCM
+ Carter Jones       | 2024-07-26      | Julian Lee         | 97110, 97140, NORCM
+ Carter Jones       | 2024-08-02      | Aiden King         | 97010, 97110, 97112, 97140, NORCM
+ Carter Lee         | 2024-07-22      | Liam Young         | 97010, 97014, 97110, 97112, 97140
+ Carter Lee         | 2024-07-30      | Noah Lee           | 97010, 97110, 97112, 97140, G0283
+ Carter Lee         | 2024-08-02      | Noah Lee           | 97010, 97110, 97112, 97140, G0283
+ Carter Lee         | 2024-08-05      | Liam Young         | 97010, 97110, 97112, 97140, G0283
+ Carter Lee         | 2024-08-08      | Noah Lee           | 97010, 97110, 97112, 97140, G0283
+ Carter Lee         | 2024-08-12      | Noah Lee           | 97010, 97110, 97112, 97140, G0283
+ Carter Lee         | 2024-08-14      | Liam Young         | 97010, 97110, 97112, 97140, G0283
+ Carter Lee         | 2024-08-22      | Liam Young         | 97010, 97110, 97112, 97140, G0283
+ Carter Lee         | 2024-08-26      | Liam Young         | 97010, 97110, 97112, 97140, G0283
+ Carter Lee         | 2024-08-29      | Liam Young         | 97010, 97110, 97112, 97140, G0283
+ Carter Lee         | 2024-09-02      | Liam Young         | 97010, 97110, 97112, 97140, G0283
+ Carter Lee         | 2024-09-04      | Liam Young         | 97010, 97110, 97112, 97140, G0283
+ Carter Lee         | 2024-09-11      | Liam Young         | 97010, 97110, 97112, 97140, G0283
+ Carter Lee         | 2024-09-18      | Liam Young         | 97010, 97110, 97112, 97140, G0283
+ Carter Lee         | 2024-09-25      | Liam Young         | 97010, 97110, 97112, 97140, G0283
+ Carter Taylor      | 2024-09-13      | Julian Lee         | 97010, 97110, 97140, NORCM
+ Carter Taylor      | 2024-09-16      | Sebastian Miller   | 97010, 97014, 97110, 97140, NORCM
+ Carter Taylor      | 2024-09-20      | Charlotte Williams | 97010, 97014, 97110, 97112, 97140, NORCM
+ Carter Taylor      | 2024-09-24      | Charlotte Williams | 97010, 97014, 97110, 97112, 97140, NORCM
+ Carter Taylor      | 2024-09-30      | Sebastian Miller   | 97010, 97014, 97110, 97112, 97140, NORCM
+ Carter Turner      | 2024-09-20      | Julian Lee         | 97110, 97140, NORCM
+ Carter Turner      | 2024-09-24      | Julian Lee         | 97110, 97140, NORCM
+ Charlotte Turner   | 2024-09-25      | Liam Young         | 97010, 97012, 97140
+ David Jones        | 2024-09-27      | Aiden King         | 97112, 97140, SP90
+ Elijah Moore       | 2024-07-30      | Aiden King         | 97014, 97110, 97112, 97140, 97161, NORCM, sp90
+ Elijah Moore       | 2024-08-07      | Aiden King         | 97014, 97110, 97112, 97140, NORCM, sp90
+ Elijah Moore       | 2024-08-14      | Aiden King         | 97014, 97110, 97112, 97140, NORCM, sp90
+ Elijah Moore       | 2024-08-20      | Aiden King         | 97014, 97110, 97112, 97140, NORCM, sp90
+ Elijah Moore       | 2024-09-04      | Aiden King         | 97014, 97110, 97112, 97140, NORCM, sp90
+ Elijah Moore       | 2024-09-18      | Aiden King         | 97014, 97110, 97112, 97140, NORCM, sp90
+ Elijah Thomas      | 2024-09-25      | Liam Young         | 97010, 97110, 97112, 97140
+ Emma King          | 2024-08-16      | Aiden King         | 97014, 97110, 97116
+ Emma King          | 2024-09-18      | Aiden King         | 97014, 97110, 97116, 97140
+ Emma Miller        | 2024-09-10      | Sebastian Miller   | NORCM, SP
+ Ethan Hernandez    | 2024-08-21      | Julian Lee         | 97110, 97140, NORCM
+ Ethan Lopez        | 2024-07-02      | Aiden King         | 97112, 97140, NORCM
+ Ethan Lopez        | 2024-07-05      | Aiden King         | 97112, 97140, NORCM
+ Ethan Lopez        | 2024-07-18      | Aiden King         | 97112, 97140, NORCM
+ Ethan Lopez        | 2024-07-22      | Aiden King         | 97112, 97140, NORCM
+ Ethan Lopez        | 2024-07-29      | Aiden King         | 97110, 97112, 97140, NORCM
+ Ethan Lopez        | 2024-08-05      | Aiden King         | 97112, 97140, NORCM
+ Ethan Lopez        | 2024-08-12      | Sebastian Martinez | 97140, NORCM
+ Ethan Lopez        | 2024-08-19      | Aiden King         | 97140, NORCM
+ Ethan Lopez        | 2024-08-27      | Aiden King         | 97140, NORCM
+ Ethan Lopez        | 2024-09-04      | Aiden King         | 97140, NORCM
+ Ethan Martin       | 2024-07-25      | Noah Lee           | 97010, 97014, 97110, 97112, 97140, NORCM, SP
+ Ethan Martin       | 2024-08-02      | Noah Lee           | 97010, 97014, 97110, 97112, 97140, NORCM, SP
+ Ethan Smith        | 2024-07-03      | Sebastian Martinez | NORCM
+ Ethan Smith        | 2024-08-14      | Sebastian Martinez | NORCM
+ Harper Hernandez   | 2024-07-08      | Sebastian Miller   | 97010, 97110, 97112, 97140
+ Harper Hernandez   | 2024-08-05      | Sebastian Miller   | 97010, 97110, 97112, 97140
+ Isabella Brown     | 2024-09-23      | Noah Lee           | 97110, 97162
+ Isabella Thomas    | 2024-07-03      | Elijah Johnson     | 97010, 97110, 97112, 97140, NORCM
+ Isabella Thomas    | 2024-07-18      | Elijah Johnson     | 97010, 97110, 97112, 97140, NORCM
+ Isabella Thomas    | 2024-08-01      | Elijah Johnson     | 97010, 97110, 97140, NORCM
+ Isabella Thomas    | 2024-08-15      | Liam Young         | 97010, 97110, 97112, 97140, NORCM
+ Isabella Thomas    | 2024-09-05      | Elijah Johnson     | 97010, 97110, 97112, 97140, NORCM
+ Isabella Thomas    | 2024-09-18      | Elijah Johnson     | 97010, 97110, 97112, 97140, NORCM
+ Julian King        | 2024-08-28      | Noah Lee           | 97112, 97140, NORCM
+ Julian King        | 2024-09-11      | Noah Lee           | 97112, 97140, NORCM
+ Layla Brown        | 2024-07-10      | Liam Young         | 97110, 97140, 97162
+ Layla Brown        | 2024-07-16      | Liam Young         | 97110, 97140
+ Layla Brown        | 2024-07-18      | Liam Young         | 97110, 97140
+ Layla Brown        | 2024-07-23      | Liam Young         | 97010, 97014, 97110, 97112, 97140
+ Layla Brown        | 2024-07-26      | Liam Young         | 97010, 97014, 97110, 97112, 97140
+ Layla Brown        | 2024-07-30      | Noah Lee           | 97010, 97014, 97110, 97112, 97140
+ Layla Brown        | 2024-08-02      | Liam Young         | 97010, 97014, 97110, 97112, 97140
+ Layla Brown        | 2024-08-05      | Liam Young         | 97010, 97014, 97110, 97140
+ Layla Brown        | 2024-08-08      | Noah Lee           | 97010, 97014, 97140
+ Layla Brown        | 2024-08-27      | Liam Young         | 97010, 97014, 97035, 97140
+ Layla Brown        | 2024-08-30      | Liam Young         | 97010, 97014, 97035, 97110, 97140
+ Layla Brown        | 2024-09-03      | Liam Young         | 97010, 97014, 97035, 97110, 97140
+ Layla Brown        | 2024-09-06      | Liam Young         | 97010, 97014, 97035, 97110, 97140
+ Layla Brown        | 2024-09-10      | Liam Young         | 97010, 97014, 97035, 97110, 97140
+ Layla Brown        | 2024-09-13      | Liam Young         | 97010, 97014, 97035, 97110, 97140
+ Layla Brown        | 2024-09-17      | Liam Young         | 97010, 97014, 97035, 97110, 97140
+ Layla Brown        | 2024-09-20      | Liam Young         | 97010, 97014, 97035, 97110, 97140
+ Layla Brown        | 2024-09-24      | Liam Young         | 97010, 97014, 97035, 97110, 97140
+ Layla Brown        | 2024-09-27      | Liam Young         | 97010, 97014, 97035, 97110, 97140
+ Layla Brown        | 2024-09-30      | Liam Young         | 97010, 97014, 97035, 97110, 97112, 97140
+ Layla Miller       | 2024-07-12      | Julian Lee         | 97010, 97110, 97112, 97140
+ Layla Miller       | 2024-07-16      | Aiden King         | 97010, 97110, 97112, 97140
+ Layla Miller       | 2024-07-25      | Aiden King         | 97010, 97110, 97112, 97140
+ Layla Miller       | 2024-07-30      | Aiden King         | 97010, 97110, 97112, 97140
+ Layla Miller       | 2024-08-14      | Aiden King         | 97010, 97110, 97112, 97140
+ Layla Miller       | 2024-08-28      | Aiden King         | 97010, 97110, 97112, 97140
+ Liam King          | 2024-07-18      | Aiden King         | 97113, NORCM
+ Liam King          | 2024-07-31      | Noah Lee           | 97010, 97112, 97140, G0283, NORCM
+ Liam King          | 2024-08-02      | Aiden King         | 97113, NORCM
+ Liam King          | 2024-08-06      | Noah Lee           | 97110, 97112, 97140, NORCM
+ Liam King          | 2024-08-09      | Aiden King         | 97113, NORCM
+ Liam King          | 2024-08-15      | Aiden King         | 97010, 97140, NORCM
+ Liam King          | 2024-08-15      | Noah Lee           | 97140, NORCM
+ Liam King          | 2024-08-20      | Noah Lee           | 97140, NORCM
+ Liam King          | 2024-08-22      | Aiden King         | 97113, NORCM
+ Liam King          | 2024-08-27      | Noah Lee           | 97010, 97140, NORCM
+ Liam King          | 2024-08-28      | Aiden King         | 97113, NORCM
+ Liam Taylor        | 2024-07-24      | Aiden King         | 97112, 97140, 97162
+ Liam Wilson        | 2024-08-23      | Sebastian Miller   | 97014, 97110, 97112, 97140, NORCM, SP$90
+ Liam Wilson        | 2024-09-09      | Sebastian Miller   | 97014, 97110, 97140, NORCM, SP$90
+ Mason Clark        | 2024-08-07      | Aiden King         | 97014, 97110, 97140, NORCM, TOS
+ Mason Miller       | 2024-09-25      | Liam Young         | 97010, 97110, 97112, 97140
+ Mason Turner       | 2024-09-24      | Sebastian Martinez | 97110, 97140, 97161, NORCM
+ Mateo Jackson      | 2024-09-17      | Noah Lee           | 97014, 97110, 97112, 97162
+ Mateo Johnson      | 2024-09-24      | Sebastian Miller   | 97110, 97140, 97162
+ Mateo Lee          | 2024-07-31      | Aiden King         | 97010, 97110, 97112, 97140, G0283, NORCM, SP
+ Mateo Lee          | 2024-08-02      | Aiden King         | 97010, 97110, 97112, 97140, G0283, NORCM, SP
+ Mateo Lee          | 2024-08-05      | Sebastian Miller   | 97010, 97014, 97110, 97112, 97140, NORCM, SP
+ Mateo Lee          | 2024-08-07      | Sebastian Miller   | 97010, 97014, 97110, 97112, 97140, NORCM, SP
+ Mateo Lee          | 2024-08-09      | Aiden King         | 97010, 97014, 97110, 97112, 97140, NORCM, SP
+ Mateo Lee          | 2024-08-12      | Charlotte Williams | 97010, 97014, 97110, 97112, 97140, NORCM, SP
+ Mateo Lee          | 2024-08-14      | Sebastian Martinez | 97010, 97014, 97110, 97112, 97140, NORCM, SP
+ Mateo Lee          | 2024-08-16      | Sebastian Martinez | 97010, 97014, 97110, 97112, 97140, NORCM, SP
+ Mateo Lee          | 2024-08-19      | Sebastian Martinez | 97010, 97014, 97110, 97112, 97140, NORCM, SP
+ Mateo Lee          | 2024-08-21      | Sebastian Miller   | 97010, 97014, 97110, 97112, 97140, NORCM, SP
+ Mateo Lee          | 2024-08-23      | Sebastian Martinez | 97010, 97014, 97110, 97112, 97140, NORCM, SP
+ Mateo Lee          | 2024-08-26      | Sebastian Martinez | 97010, 97014, 97110, 97112, 97140, NORCM, SP
+ Mateo Lee          | 2024-08-28      | Charlotte Williams | 97010, 97014, 97110, 97112, 97140, NORCM, SP
+ Mateo Lee          | 2024-08-30      | Julian Lee         | 97010, 97014, 97110, 97112, 97140, NORCM, SP
+ Mateo Lee          | 2024-09-03      | Charlotte Williams | 97010, 97014, 97110, 97112, 97140, NORCM, SP
+ Mateo Lee          | 2024-09-05      | Charlotte Williams | 97010, 97014, 97110, 97112, 97140, NORCM, SP
+ Mateo Lee          | 2024-09-09      | Charlotte Williams | 97010, 97014, 97110, 97112, 97140, NORCM, SP
+ Mateo Lee          | 2024-09-11      | Charlotte Williams | 97010, 97014, 97110, 97112, 97140, NORCM, SP
+ Mateo Lee          | 2024-09-13      | Julian Lee         | 97010, 97014, 97110, 97112, 97140, NORCM, SP
+ Mateo Lee          | 2024-09-17      | Sebastian Miller   | 97010, 97014, 97110, 97112, 97140, NORCM, SP
+ Mateo Lee          | 2024-09-19      | Sebastian Miller   | 97010, 97014, 97110, 97112, 97140, NORCM, SP
+ Mateo Lee          | 2024-09-23      | Charlotte Williams | 97010, 97014, 97110, 97112, 97140, NORCM, SP
+ Mateo Lee          | 2024-09-25      | Sebastian Martinez | 97010, 97014, 97110, 97112, 97140, NORCM, SP
+ Mateo Lee          | 2024-09-27      | Charlotte Williams | 97010, 97014, 97110, 97112, 97140, NORCM, SP
+ Mateo Thomas       | 2024-07-01      | Sebastian Miller   | 97010, 97110, 97112, 97140
+ Mateo Thomas       | 2024-07-08      | Sebastian Martinez | 97010, 97110, 97112, 97140
+ Mateo Thomas       | 2024-08-01      | Aiden King         | 97010, 97110, 97112, 97140
+ Mateo Thomas       | 2024-08-05      | Sebastian Martinez | 97010, 97110, 97112, 97140
+ Mia Brown          | 2024-09-11      | Julian Lee         | 97110, 97140, 97161, NORCM
+ Mia Brown          | 2024-09-19      | Charlotte Williams | 97110, 97140, NORCM
+ Mia Brown          | 2024-09-25      | Julian Lee         | 97010, 97110, 97140, NORCM
+ Noah Gonzalez      | 2024-07-10      | Elijah Johnson     | 97010, 97110, 97112, 97140, 97161, NORCM
+ Noah Gonzalez      | 2024-07-16      | Elijah Johnson     | 97010, 97110, 97140, NORCM
+ Noah Gonzalez      | 2024-07-18      | Elijah Johnson     | 97010, 97110, 97140, NORCM
+ Noah Gonzalez      | 2024-07-25      | Elijah Johnson     | 97010, 97110, 97140, NORCM
+ Noah Gonzalez      | 2024-08-01      | Elijah Johnson     | 97010, 97110, 97140, NORCM
+ Noah Lopez         | 2024-07-23      | Aiden King         | 97010, 97110, 97112, 97140
+ Noah Moore         | 2024-08-26      | Aiden King         | 97110, 97112, 97140, NORCM, sp90
+ Noah Moore         | 2024-09-04      | Aiden King         | 97110, 97112, 97140, NORCM, sp90
+ Noah Moore         | 2024-09-11      | Aiden King         | 97110, 97112, 97140, NORCM, sp90
+ Noah Moore         | 2024-09-18      | Aiden King         | 97110, 97112, 97140, NORCM, sp90
+ Noah Smith         | 2024-07-08      | Aiden King         | 97010, 97110, 97112, 97140, NORCM
+ Noah Taylor        | 2024-07-09      | Noah Lee           | 97010, 97140
+ Noah Taylor        | 2024-07-18      | Noah Lee           | 97010, 97140
+ Noah Young         | 2024-09-06      | Noah Lee           | 97112, 97140, NORCM
+ Noah Young         | 2024-09-27      | Noah Lee           | 97112, 97140, NORCM
+ Olivia Johnson     | 2024-08-13      | Aiden King         | 97010, 97110, 97112, 97140, G0283
+ Olivia Lee         | 2024-07-29      | Aiden King         | 97010, 97110, 97112, 97140, NORCM, sp90
+ Olivia Lee         | 2024-08-23      | Aiden King         | 97010, 97110, 97112, 97140, NORCM, sp90
+ Olivia Lee         | 2024-09-16      | Aiden King         | 97010, 97110, 97112, 97140, NORCM, sp90
+ Olivia Martin      | 2024-09-03      | Noah Lee           | 97010, 97110, 97112, 97140
+ Olivia Martin      | 2024-09-06      | Aiden King         | 97010, 97110, 97112, 97140
+ Olivia Martin      | 2024-09-10      | Noah Lee           | 97010, 97110, 97112, 97140
+ Olivia Martin      | 2024-09-13      | Noah Lee           | 97010, 97110, 97112, 97140
+ Olivia Martin      | 2024-09-20      | Noah Lee           | 97010, 97110, 97112, 97140
+ Olivia Martin      | 2024-09-24      | Aiden King         | 97010, 97110, 97112, 97140
+ Olivia Miller      | 2024-07-08      | Sebastian Miller   | 97110, 97162, NORCM, SP110
+ Olivia Miller      | 2024-07-23      | Sebastian Miller   | 97110, 97112, 97140, NORCM, SP90
+ Olivia Miller      | 2024-08-01      | Sebastian Miller   | 97110, 97112, 97140, NORCM, SP90
+ Olivia Miller      | 2024-08-08      | Sebastian Miller   | 97110, 97112, 97140, NORCM, SP90
+ Olivia Miller      | 2024-08-15      | Sebastian Miller   | 97110, 97112, 97140, NORCM, SP90
+ Olivia Miller      | 2024-08-29      | Sebastian Miller   | 97110, 97112, 97140, NORCM, SP90
+ Olivia Miller      | 2024-09-26      | Sebastian Miller   | 97110, 97112, 97140, NORCM, SP90
+ Olivia Moore       | 2024-08-21      | Sebastian Miller   | 97110, 97112, 97140, 97162, NORCM, SP$110
+ Olivia Moore       | 2024-08-23      | Sebastian Miller   | 97110, 97112, 97140, NORCM, SP$90
+ Olivia Moore       | 2024-09-16      | Sebastian Miller   | 97110, 97112, NORCM, SP$90
+ Olivia Moore       | 2024-09-20      | Sebastian Miller   | 97110, 97112, NORCM, SP$90
+ Olivia Moore       | 2024-09-24      | Sebastian Miller   | 97110, 97112, NORCM, SP$90
+ Olivia Moore       | 2024-09-26      | Sebastian Miller   | 97110, 97112, NORCM, SP$90
+ Olivia Perez       | 2024-08-06      | Aiden King         | 97010, 97110, 97112, 97140, NORCM, sp90
+ Olivia Perez       | 2024-08-12      | Aiden King         | 97010, 97110, 97112, 97140, NORCM, sp90
+ Olivia Perez       | 2024-08-20      | Aiden King         | 97010, 97110, 97112, 97140, NORCM, sp90
+ Olivia Perez       | 2024-08-27      | Aiden King         | 97010, 97110, 97112, 97140, NORCM, sp90
+ Olivia Perez       | 2024-09-10      | Aiden King         | 97010, 97110, 97112, 97140, NORCM, sp90
+ Olivia Perez       | 2024-09-17      | Aiden King         | 97010, 97110, 97112, 97140, NORCM, sp90
+ Olivia Perez       | 2024-09-25      | Noah Lee           | 97010, 97110, 97112, 97140, NORCM, sp90
+ Scarlett Allen     | 2024-07-10      | Aiden King         | 97010, 97110, 97112, 97140, G0283
+ Scarlett Johnson   | 2024-07-15      | Aiden King         | 97010, 97014, 97110, 97112, 97140, NORCM
+ Scarlett Johnson   | 2024-07-17      | Aiden King         | 97010, 97014, 97110, 97112, 97140, NORCM
+ Scarlett Johnson   | 2024-07-24      | Aiden King         | 97010, 97014, 97110, 97112, 97140, NORCM, sp90
+ Scarlett Johnson   | 2024-07-29      | Aiden King         | 97010, 97014, 97110, 97112, 97140, NORCM, sp90
+ Scarlett Johnson   | 2024-07-31      | Aiden King         | 97010, 97014, 97110, 97112, 97140, NORCM, sp90
+ Scarlett Johnson   | 2024-08-05      | Aiden King         | 97010, 97014, 97110, 97112, 97140, NORCM, sp90
+ Scarlett Johnson   | 2024-08-09      | Aiden King         | 97010, 97014, 97110, 97112, 97140, NORCM, sp90
+ Scarlett Johnson   | 2024-08-12      | Aiden King         | 97010, 97014, 97110, 97112, 97140, NORCM, sp90
+ Scarlett Johnson   | 2024-08-19      | Aiden King         | 97010, 97014, 97110, 97112, 97140, NORCM, sp90
+ Scarlett Johnson   | 2024-08-26      | Aiden King         | 97010, 97014, 97110, 97112, 97140, NORCM, sp90
+ Scarlett Johnson   | 2024-08-30      | Aiden King         | 97010, 97014, 97110, 97112, 97140, NORCM, sp90
+ Scarlett Johnson   | 2024-09-16      | Aiden King         | 97010, 97014, 97110, 97112, 97140, NORCM, sp90
+ Scarlett Miller    | 2024-08-27      | Julian Lee         | 97110, 97140, 97161, NORCM
+ Sebastian Anderson | 2024-09-06      | Sebastian Martinez | NORCM
+ Sebastian Anderson | 2024-09-16      | Sebastian Martinez | NORCM
+ Sebastian Anderson | 2024-09-20      | Sebastian Martinez | NORCM
+ Sebastian Jackson  | 2024-07-05      | Aiden King         | 97010, 97014, 97110, 97112, 97140, NORCM, TOS115
+ Sebastian Jackson  | 2024-07-08      | Aiden King         | 97010, 97014, 97110, 97112, 97140, NORCM, TOS115
+ Sebastian Jackson  | 2024-07-10      | Aiden King         | 97010, 97014, 97110, 97112, 97140, NORCM, TOS115
+ Sebastian Jackson  | 2024-07-17      | Sebastian Miller   | 97010, 97014, 97110, 97112, 97140, NORCM, TOS115
+ Sebastian Jackson  | 2024-07-18      | Aiden King         | 97010, 97014, 97110, 97112, 97140, NORCM, TOS115
+ Sebastian Jackson  | 2024-07-23      | Charlotte Williams | 97010, 97014, 97110, 97112, 97140, NORCM, TOS115
+ Sebastian Jackson  | 2024-07-26      | Aiden King         | 97010, 97014, 97110, 97112, 97140, NORCM, TOS115
+ Sebastian Jackson  | 2024-07-29      | Aiden King         | 97010, 97014, 97110, 97112, 97140, NORCM, TOS115
+ Sebastian Jackson  | 2024-08-01      | Aiden King         | 97010, 97014, 97110, 97112, 97140, NORCM, TOS115
+ Sebastian Jackson  | 2024-08-06      | Aiden King         | 97010, 97014, 97110, 97112, 97140, NORCM, TOS115
+ Sebastian Jackson  | 2024-08-08      | Aiden King         | 97010, 97014, 97110, 97112, 97140, NORCM, TOS115
+ Sebastian Jackson  | 2024-08-13      | Sebastian Miller   | 97010, 97014, 97110, 97112, 97140, NORCM, TOS115
+ Sebastian Jackson  | 2024-08-15      | Aiden King         | 97010, 97014, 97110, 97112, 97140, NORCM, TOS115
+ Sebastian Jackson  | 2024-08-20      | Aiden King         | 97010, 97014, 97110, 97112, 97140, NORCM, TOS115
+ Sebastian Jackson  | 2024-08-22      | Aiden King         | 97010, 97014, 97110, 97112, 97140, NORCM, TOS115
+ Sebastian Jackson  | 2024-08-26      | Charlotte Williams | 97010, 97014, 97110, 97112, 97140, NORCM, TOS115
+ Sebastian Jackson  | 2024-08-29      | Sebastian Miller   | 97010, 97014, 97110, 97112, 97140, NORCM, TOS115
+ Sebastian Jackson  | 2024-09-03      | Sebastian Miller   | 97010, 97014, 97110, 97112, 97140, NORCM, TOS115
+ Sebastian Jackson  | 2024-09-05      | Sebastian Miller   | 97010, 97014, 97110, 97112, 97140, NORCM, TOS115
+ Sebastian Jackson  | 2024-09-09      | Sebastian Miller   | 97010, 97014, 97110, 97112, 97140, NORCM, TOS115
+ Sebastian Jackson  | 2024-09-11      | Sebastian Miller   | 97010, 97014, 97110, 97112, 97140, NORCM, TOS115
+ Sebastian Jackson  | 2024-09-13      | Sebastian Miller   | 97010, 97014, 97110, 97112, 97140, NORCM, TOS115
+ Sebastian Jackson  | 2024-09-16      | Aiden King         | 97010, 97014, 97110, 97112, 97140, NORCM, TOS115
+ Sebastian Jackson  | 2024-09-18      | Aiden King         | 97010, 97014, 97110, 97112, 97140, NORCM, TOS115
+ Sebastian Jackson  | 2024-09-23      | Charlotte Williams | 97010, 97014, 97110, 97112, 97140, NORCM, TOS115
+ Sebastian Jackson  | 2024-09-25      | Sebastian Miller   | 97010, 97014, 97110, 97112, 97140, NORCM, TOS115
+ Sebastian Jackson  | 2024-09-26      | Sebastian Miller   | 97010, 97014, 97110, 97112, 97140, NORCM, TOS115
+ Sebastian Jones    | 2024-09-10      | Julian Lee         | 97140, 97161, NORCM
+ Sebastian Moore    | 2024-07-10      | Aiden King         | 97112, 97140, NORCM
+ Sebastian Moore    | 2024-07-30      | Aiden King         | 97112, 97140, NORCM
+ Sebastian Perez    | 2024-08-12      | Liam Young         | 97010, 97110, 97112, 97140, NORCM
+ Sebastian Perez    | 2024-08-16      | Noah Lee           | 97010, 97110, 97112, 97140, NORCM
+ Sebastian Perez    | 2024-08-23      | Noah Lee           | 97010, 97110, 97112, 97140, NORCM
+ Sebastian Perez    | 2024-08-30      | Noah Lee           | 97010, 97110, 97112, 97140, NORCM
+ Sebastian Perez    | 2024-09-06      | Noah Lee           | 97010, 97110, 97112, 97140, NORCM
+ Sebastian Perez    | 2024-09-13      | Noah Lee           | 97010, 97110, 97112, 97140, NORCM
+ Sebastian Perez    | 2024-09-20      | Noah Lee           | 97010, 97110, 97112, 97140, 97530, NORCM
+ Sophia Hernandez   | 2024-08-20      | Aiden King         | 97110, 97112, 97140, 97161
+ Sophia Smith       | 2024-09-19      | Noah Lee           | 97010, 97014, 97110, 97140, 97161
+ Sophia Young       | 2024-07-19      | Noah Lee           | 97035, 97112, 97140
+ Sophia Young       | 2024-07-26      | Aiden King         | 97113
+ Sophia Young       | 2024-08-02      | Noah Lee           | 97035, 97112, 97140
+ Sophia Young       | 2024-08-16      | Noah Lee           | 97035, 97112, 97140
+ Sophia Young       | 2024-08-27      | Sebastian Martinez | 97032, 97110, 97140, NORCM
+ Sophia Young       | 2024-09-03      | Sebastian Martinez | 97032, 97110, 97140, NORCM
+ Sophia Young       | 2024-09-17      | Sebastian Martinez | 97032, 97110, 97140, NORCM
+ Zoe Miller         | 2024-09-30      | Sebastian Martinez | 97010, 97014, 97110, 97140
+ Zoey Lopez         | 2024-07-18      | Charlotte Williams | 97110, 97140, 97162, NORCM
+ Zoey Lopez         | 2024-07-31      | Charlotte Williams | 97110, 97140, NORCM
+ Zoey Lopez         | 2024-08-14      | Charlotte Williams | 97110, 97140, NORCM
+ Zoey Lopez         | 2024-08-23      | Charlotte Williams | 97110, 97140, NORCM
+ Zoey Lopez         | 2024-09-06      | Julian Lee         | 97110, 97140, NORCM
+ Zoey Martin        | 2024-07-01      | Aiden King         | 97010, 97112, 97140, NORCM, sp90
+ Zoey Martin        | 2024-07-15      | Aiden King         | 97010, 97112, 97140, NORCM, sp90
+ Zoey Martin        | 2024-07-29      | Aiden King         | 97010, 97112, 97140, NORCM, sp90
+ Zoey Martin        | 2024-08-15      | Aiden King         | 97010, 97112, 97140, NORCM, sp90
+ Zoey Martin        | 2024-09-30      | Aiden King         | 97010, 97112, 97140, NORCM, sp90
+ Zoey Perez         | 2024-08-14      | Charlotte Williams | 97110, 97140, 97162, NORCM
+ Zoey Perez         | 2024-08-21      | Charlotte Williams | 97110, 97140, NORCM
+(282 rows)
+
+SELECT COUNT(*)                    AS ehr_encounters,
+       COUNT(d.patient)            AS imported,
+       COUNT(*) - COUNT(d.patient) AS missing,
+       ROUND(100.0 * (COUNT(*) - COUNT(d.patient)) / COUNT(*), 2) AS missing_pct
+FROM ehr_encounters e
+LEFT JOIN db_encounters d
+       ON d.patient = e.patient AND d.provider = e.provider AND d.dos = e.dos;
+ ehr_encounters | imported | missing | missing_pct 
+----------------+----------+---------+-------------
+           6612 |     6330 |     282 |        4.26
+(1 row)
+
+/* =====================================================================
+   TASK 2 – WHY are they missing?
+   ===================================================================== */
+-- T2a. Which codes are in the EHR but NEVER in the DB?
+--      string_to_array + unnest turns '97010, 97140' into 2 rows: 97010 | 97140
+CREATE TABLE flag_codes AS
+SELECT cpt, COUNT(*) AS ehr_encounters
+FROM (SELECT unnest(string_to_array(cpt_codes, ', ')) AS cpt FROM ehr_encounters) ehr_codes
+WHERE cpt NOT IN (SELECT unnest(string_to_array(cpt_codes, ', ')) FROM db_encounters)
+GROUP BY cpt;
+SELECT 11
+SELECT * FROM flag_codes ORDER BY ehr_encounters DESC;
+  cpt   | ehr_encounters 
+--------+----------------
+ NORCM  |            206
+ sp90   |             36
+ SP     |             27
+ TOS115 |             27
+ SP$90  |              7
+ SP90   |              7
+ SP110  |              1
+ TOS    |              1
+ SP$110 |              1
+ 1      |              1
+ sp120  |              1
+(11 rows)
+
+CREATE TABLE p2_encounters AS
+SELECT e.patient, e.provider, e.dos, e.cpt_codes, e.n_codes,
+       CASE WHEN d.patient IS NULL THEN 'Missing' ELSE 'Imported' END AS status,
+       EXISTS (SELECT 1
+               FROM unnest(string_to_array(e.cpt_codes, ', ')) AS c(cpt)
+               WHERE c.cpt IN (SELECT cpt FROM flag_codes))          AS has_flag
+FROM ehr_encounters e
+LEFT JOIN db_encounters d
+       ON d.patient = e.patient AND d.provider = e.provider AND d.dos = e.dos;
+SELECT 6612
+SELECT CASE WHEN has_flag THEN 'Has flag code' ELSE 'Real CPT codes only' END AS segment,
+       COUNT(*)                                   AS encounters,
+       COUNT(*) FILTER (WHERE status = 'Missing') AS missing,
+       ROUND(100.0 * COUNT(*) FILTER (WHERE status = 'Missing') / COUNT(*), 1) AS missing_rate_pct
+FROM p2_encounters
+GROUP BY has_flag
+ORDER BY missing_rate_pct DESC;
+       segment       | encounters | missing | missing_rate_pct 
+---------------------+------------+---------+------------------
+ Has flag code       |        208 |     205 |             98.6
+ Real CPT codes only |       6404 |      77 |              1.2
+(2 rows)
+
+SELECT cpt,
+       COUNT(*)                                   AS encounters,
+       COUNT(*) FILTER (WHERE status = 'Missing') AS missing,
+       ROUND(100.0 * COUNT(*) FILTER (WHERE status = 'Missing') / COUNT(*), 1) AS missing_rate_pct
+FROM (SELECT status, unnest(string_to_array(cpt_codes, ', ')) AS cpt FROM p2_encounters) x
+GROUP BY cpt
+ORDER BY missing_rate_pct DESC, encounters DESC;
+  cpt   | encounters | missing | missing_rate_pct 
+--------+------------+---------+------------------
+ TOS115 |         27 |      27 |            100.0
+ SP     |         27 |      27 |            100.0
+ SP90   |          7 |       7 |            100.0
+ SP$90  |          7 |       7 |            100.0
+ TOS    |          1 |       1 |            100.0
+ SP$110 |          1 |       1 |            100.0
+ SP110  |          1 |       1 |            100.0
+ 1      |          1 |       1 |            100.0
+ sp120  |          1 |       1 |            100.0
+ NORCM  |        206 |     203 |             98.5
+ sp90   |         36 |      35 |             97.2
+ 97113  |         90 |      10 |             11.1
+ 97035  |        238 |      23 |              9.7
+ 97032  |         36 |       3 |              8.3
+ 97116  |         29 |       2 |              6.9
+ 97014  |       1843 |     101 |              5.5
+ 97012  |         20 |       1 |              5.0
+ 97140  |       6265 |     258 |              4.1
+ 97112  |       4838 |     200 |              4.1
+ 97110  |       5567 |     225 |              4.0
+ 97010  |       4772 |     178 |              3.7
+ 97162  |        250 |       9 |              3.6
+ G0283  |        755 |      19 |              2.5
+ 97161  |        378 |       8 |              2.1
+ 97163  |         56 |       1 |              1.8
+ 97530  |        126 |       1 |              0.8
+ 97124  |         23 |       0 |              0.0
+ 97164  |         11 |       0 |              0.0
+ 98960  |          6 |       0 |              0.0
+ 97606  |          3 |       0 |              0.0
+ 98970  |          2 |       0 |              0.0
+(31 rows)
+
+SELECT TO_CHAR(dos, 'YYYY-MM') AS month,
+       COUNT(*) AS encounters,
+       COUNT(*) FILTER (WHERE status = 'Missing') AS missing,
+       ROUND(100.0 * COUNT(*) FILTER (WHERE status = 'Missing') / COUNT(*), 2) AS missing_rate_pct
+FROM p2_encounters WHERE NOT has_flag
+GROUP BY 1 ORDER BY 1;
+  month  | encounters | missing | missing_rate_pct 
+---------+------------+---------+------------------
+ 2024-07 |       2098 |      22 |             1.05
+ 2024-08 |       2165 |      23 |             1.06
+ 2024-09 |       2141 |      32 |             1.49
+(3 rows)
+
+SELECT TO_CHAR(dos, 'FMDay') AS weekday,
+       COUNT(*) AS encounters,
+       COUNT(*) FILTER (WHERE status = 'Missing') AS missing,
+       ROUND(100.0 * COUNT(*) FILTER (WHERE status = 'Missing') / COUNT(*), 2) AS missing_rate_pct
+FROM p2_encounters WHERE NOT has_flag
+GROUP BY 1, EXTRACT(ISODOW FROM dos) ORDER BY EXTRACT(ISODOW FROM dos);
+  weekday  | encounters | missing | missing_rate_pct 
+-----------+------------+---------+------------------
+ Monday    |       1357 |      14 |             1.03
+ Tuesday   |       1394 |      20 |             1.43
+ Wednesday |       1271 |      16 |             1.26
+ Thursday  |       1177 |       9 |             0.76
+ Friday    |       1123 |      18 |             1.60
+ Saturday  |         81 |       0 |             0.00
+ Sunday    |          1 |       0 |             0.00
+(7 rows)
+
+SELECT provider,
+       COUNT(*) AS encounters,
+       COUNT(*) FILTER (WHERE status = 'Missing') AS missing,
+       ROUND(100.0 * COUNT(*) FILTER (WHERE status = 'Missing') / COUNT(*), 2) AS missing_rate_pct
+FROM p2_encounters WHERE NOT has_flag
+GROUP BY provider ORDER BY missing_rate_pct DESC;
+      provider      | encounters | missing | missing_rate_pct 
+--------------------+------------+---------+------------------
+ Liam Young         |        622 |      34 |             5.47
+ Noah Lee           |       1483 |      19 |             1.28
+ Aiden King         |       1853 |      16 |             0.86
+ Sebastian Miller   |        607 |       4 |             0.66
+ Sebastian Martinez |        557 |       3 |             0.54
+ Julian Lee         |        473 |       1 |             0.21
+ Charlotte Williams |        576 |       0 |             0.00
+ Elijah Johnson     |        233 |       0 |             0.00
+(8 rows)
+
+SELECT patient, COUNT(*) AS missing_visits
+FROM p2_encounters
+WHERE status = 'Missing' AND NOT has_flag
+GROUP BY patient ORDER BY missing_visits DESC
+LIMIT 10;
+     patient      | missing_visits 
+------------------+----------------
+ Layla Brown      |             20
+ Carter Lee       |             15
+ Olivia Martin    |              6
+ Layla Miller     |              6
+ Sophia Young     |              4
+ Mateo Thomas     |              4
+ Harper Hernandez |              2
+ Emma King        |              2
+ Noah Taylor      |              2
+ Aiden Clark      |              2
+(10 rows)
+
+CREATE TABLE db_only AS
+SELECT d.patient, d.provider, d.dos
+FROM db_encounters d
+LEFT JOIN ehr_encounters e
+       ON e.patient = d.patient AND e.provider = d.provider AND e.dos = d.dos
+WHERE e.patient IS NULL;
+SELECT 44
+SELECT m.patient, m.dos, m.provider AS ehr_provider, o.provider AS db_provider
+FROM p2_encounters m
+JOIN db_only o ON o.patient = m.patient AND o.dos = m.dos
+WHERE m.status = 'Missing' AND NOT m.has_flag;
+     patient      |    dos     | ehr_provider |    db_provider     
+------------------+------------+--------------+--------------------
+ Aiden Clark      | 2024-09-04 | Liam Young   | Noah Lee
+ Emma King        | 2024-08-16 | Aiden King   | Julian Lee
+ Emma King        | 2024-09-18 | Aiden King   | Julian Lee
+ Liam Taylor      | 2024-07-24 | Aiden King   | Noah Lee
+ Noah Lopez       | 2024-07-23 | Aiden King   | Sebastian Miller
+ Olivia Johnson   | 2024-08-13 | Aiden King   | Sebastian Martinez
+ Sophia Hernandez | 2024-08-20 | Aiden King   | Sebastian Miller
+ Sophia Smith     | 2024-09-19 | Noah Lee     | Liam Young
+(8 rows)
+
+SELECT m.patient, m.provider, m.dos AS ehr_date, o.dos AS db_date, ABS(m.dos - o.dos) AS days_apart
+FROM p2_encounters m
+JOIN db_only o ON o.patient = m.patient AND o.provider = m.provider
+WHERE m.status = 'Missing' AND NOT m.has_flag
+  AND ABS(m.dos - o.dos) <= 7
+  AND NOT EXISTS (SELECT 1 FROM db_only x WHERE x.patient = m.patient AND x.dos = m.dos);
+   patient   | provider |  ehr_date  |  db_date   | days_apart 
+-------------+----------+------------+------------+------------
+ Aiden Clark | Noah Lee | 2024-09-06 | 2024-09-04 |          2
+(1 row)
+
+UPDATE p2_encounters p SET reason =
+  CASE
+    WHEN p.status = 'Imported' THEN 'Imported'
+    WHEN p.has_flag THEN 'Non-billable flag code (NORCM/SP/TOS)'
+    WHEN EXISTS (SELECT 1 FROM db_only o
+                 WHERE o.patient = p.patient AND o.dos = p.dos)
+         THEN 'Rendering provider mismatch'
+    WHEN EXISTS (SELECT 1 FROM db_only o
+                 WHERE o.patient = p.patient AND o.provider = p.provider AND ABS(o.dos - p.dos) <= 7)
+         THEN 'Date of service mismatch'
+    WHEN p.patient IN (SELECT patient FROM p2_encounters
+                       WHERE status = 'Missing' AND NOT has_flag
+                       GROUP BY patient HAVING COUNT(*) >= 3)
+         THEN 'Patient-level block (run of visits)'
+    ELSE 'Isolated gap (no pattern)'
+  END;
+UPDATE 6612
+SELECT reason,
+       COUNT(*) AS encounters,
+       ROUND(100.0 * COUNT(*) / SUM(COUNT(*)) OVER (), 1) AS pct_of_missing
+FROM p2_encounters
+WHERE status = 'Missing'
+GROUP BY reason
+ORDER BY encounters DESC;
+                reason                 | encounters | pct_of_missing 
+---------------------------------------+------------+----------------
+ Non-billable flag code (NORCM/SP/TOS) |        205 |           72.7
+ Patient-level block (run of visits)   |         55 |           19.5
+ Isolated gap (no pattern)             |         13 |            4.6
+ Rendering provider mismatch           |          8 |            2.8
+ Date of service mismatch              |          1 |            0.4
+(5 rows)
+
+SELECT patient, provider, dos, cpt_codes FROM p2_encounters WHERE has_flag AND status = 'Imported';
+   patient    |  provider  |    dos     |                cpt_codes                 
+--------------+------------+------------+------------------------------------------
+ Carter Jones | Aiden King | 2024-07-22 | 97010, 97110, 97112, 97140, NORCM
+ Liam King    | Aiden King | 2024-09-26 | 97010, 97014, 97110, 97112, 97140, NORCM
+ Olivia Perez | Aiden King | 2024-09-04 | 97010, 97110, 97112, 97140, NORCM, sp90
+(3 rows)
+
+SELECT COUNT(*) AS flagged_with_real_cpt
+FROM p2_encounters p
+WHERE has_flag
+  AND EXISTS (SELECT 1 FROM unnest(string_to_array(p.cpt_codes, ', ')) AS c(cpt)
+              WHERE c.cpt NOT IN (SELECT cpt FROM flag_codes));
+ flagged_with_real_cpt 
+-----------------------
+                   202
+(1 row)
+
+SELECT COUNT(*) AS db_visits_with_multiple_records FROM db_encounters WHERE db_records > 1;
+ db_visits_with_multiple_records 
+---------------------------------
+                             108
+(1 row)
+
